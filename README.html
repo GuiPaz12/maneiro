@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Portal</title>
+<style>
+    body{background:#111;color:#0f0;font-family:Arial;text-align:center;padding-top:10%}
+    input,button{padding:10px;margin:5px}
+    #login,#dash{display:none}
+    table{margin:auto;border-collapse:collapse;width:90%}
+    th,td{border:1px solid #0f0;padding:8px;font-size:12px}
+</style>
+</head>
+<body>
+
+<!-- TELA DE LOGIN -->
+<div id="login" style="display:block">
+    <h2>ÁREA RESTRITA</h2>
+    <input id="pwd" type="password" placeholder="Senha">
+    <br><button onclick="go()">Entrar</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dash">
+    <h2>Visitantes Capturados</h2>
+    <table id="tbl">
+        <thead><tr>
+            <th>Usuário</th>
+            <th>Navegador</th>
+            <th>IP</th>
+            <th>Local</th>
+            <th>Data/Hora</th>
+        </tr></thead>
+        <tbody></tbody>
+    </table>
+    <br><button onclick="exportar()">Exportar CSV</button>
+</div>
+
+<script>
+const SENHA = '123';
+const KEY   = 'db_vitimas';
+
+// ---------- LOGIN ----------
+function go(){
+    if(document.getElementById('pwd').value === SENHA){
+        document.getElementById('login').style.display='none';
+        document.getElementById('dash').style.display='block';
+        mostrar();
+    }else{
+        alert('Senha incorreta');
+        document.getElementById('pwd').value='';
+    }
+}
+
+// ---------- CAPTURA ----------
+(async function capturar(){
+    const nome = prompt('Digite um nome de usuário:') || 'Anônimo';
+    
+    // Pega IP e localização
+    let ip = '-';
+    let cidade = '-';
+    let estado = '-';
+    let pais = '-';
+    
+    try {
+        // Usa ipify para IP
+        const ipRes = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipRes.json();
+        ip = ipData.ip;
+        
+        // Usa ipapi para geolocalização
+        const geoRes = await fetch(`https://ipapi.co/${ip}/json/`);
+        const geo = await geoRes.json();
+        cidade = geo.city || '-';
+        estado = geo.region || '-';
+        pais = geo.country_name || '-';
+    } catch(e) {
+        console.log('Erro ao pegar IP/local:', e);
+    }
+    
+    const info = {
+        usuario: nome,
+        navegador: navigator.userAgent,
+        ip: ip,
+        local: `${cidade}, ${estado} - ${pais}`,
+        data: new Date().toLocaleString('pt-BR')
+    };
+    
+    let arr = JSON.parse(localStorage.getItem(KEY)||'[]');
+    arr.push(info);
+    localStorage.setItem(KEY, JSON.stringify(arr));
+})();
+
+// ---------- MOSTRA ----------
+function mostrar(){
+    const arr = JSON.parse(localStorage.getItem(KEY)||'[]');
+    const tb  = document.querySelector('#tbl tbody');
+    tb.innerHTML = '';
+    arr.reverse().forEach(r=>{
+        tb.insertAdjacentHTML('beforeend',
+            `<tr>
+                <td>${r.usuario}</td>
+                <td>${r.navegador}</td>
+                <td>${r.ip}</td>
+                <td>${r.local}</td>
+                <td>${r.data}</td>
+            </tr>`);
+    });
+}
+
+// ---------- EXPORTA ----------
+function exportar(){
+    const arr = JSON.parse(localStorage.getItem(KEY)||'[]');
+    let csv = 'Usuário,Navegador,IP,Local,Data/Hora\n';
+    arr.forEach(r=>csv+=`"${r.usuario}","${r.navegador}","${r.ip}","${r.local}","${r.data}"\n`);
+    const blob = new Blob([csv],{type:'text/csv'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href=url;a.download='vitimas.csv';a.click();
+}
+</script>
+</body>
+</html>
